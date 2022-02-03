@@ -1,0 +1,20 @@
+# custom config
+ExecVars.py
+
+# you know these
+venv
+__pycache__
+
+# Telethon sessions
+*.session
+*.session-journal
+
+# tests
+test*.*
+splfil/
+
+# runtime files
+Downloads/
+userdata/
+torlog.txt
+

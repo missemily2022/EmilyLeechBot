@@ -295,27 +295,24 @@ async def handle_leech_command(e):
         is_ext = zipext[1]
 
         # Set rclone based on choice
-        if choice == "drive":
-            rclone = True
-        else:
-            rclone = False
-
+        rclone = choice == "drive"
         await conf_mes.delete()
 
-        if rclone:
-            if get_val("RCLONE_ENABLED"):
-                await check_link(e, rclone, is_zip, is_ext, conf_mes)
-            else:
-                await e.reply(
-                    "<b>DRIVE IS DISABLED BY THE ADMIN</b>", parse_mode="html"
-                )
+        if (
+            rclone
+            and get_val("RCLONE_ENABLED")
+            or not rclone
+            and get_val("LEECH_ENABLED")
+        ):
+            await check_link(e, rclone, is_zip, is_ext, conf_mes)
+        elif rclone and not get_val("RCLONE_ENABLED"):
+            await e.reply(
+                "<b>DRIVE IS DISABLED BY THE ADMIN</b>", parse_mode="html"
+            )
         else:
-            if get_val("LEECH_ENABLED"):
-                await check_link(e, rclone, is_zip, is_ext, conf_mes)
-            else:
-                await e.reply(
-                    "<b>TG LEECH IS DISABLED BY THE ADMIN</b>", parse_mode="html"
-                )
+            await e.reply(
+                "<b>TG LEECH IS DISABLED BY THE ADMIN</b>", parse_mode="html"
+            )
 
 
 async def get_leech_choice(e, timestamp):
@@ -340,14 +337,7 @@ async def get_leech_choice(e, timestamp):
     while not lis[0]:
         if (time.time() - start) >= 60:  # TIMEOUT_SEC:
 
-            if defleech == "leech":
-                return "tg"
-            elif defleech == "rclone":
-                return "drive"
-            else:
-                # just in case something goes wrong
-                return "tg"
-            break
+            return "drive" if defleech == "rclone" else "tg"
         await aio.sleep(1)
 
     val = lis[1]
@@ -480,7 +470,7 @@ async def handle_upcancel_cb(e):
     db = upload_db
 
     data = e.data.decode("UTF-8")
-    torlog.info("Data is {}".format(data))
+    torlog.info(f"Data is {data}")
     data = data.split(" ")
 
     if str(e.sender_id) == data[3]:
@@ -500,13 +490,12 @@ async def callback_handler_canc(e):
 
     torlog.debug(f"Here the sender _id is {e.sender_id}")
     torlog.debug(
-        "here is the allower users list {} {}".format(
-            get_val("ALD_USR"), type(get_val("ALD_USR"))
-        )
+        f'here is the allower users list {get_val("ALD_USR")} {type(get_val("ALD_USR"))}'
     )
 
+
     data = e.data.decode("utf-8").split(" ")
-    torlog.debug("data is {}".format(data))
+    torlog.debug(f"data is {data}")
 
     is_aria = False
     is_mega = False
@@ -544,10 +533,7 @@ async def handle_exec_message_f(e):
     if await is_admin(client, message.sender_id, message.chat_id, force_owner=True):
         cmd = message.text.split(" ", maxsplit=1)[1]
 
-        reply_to_id = message.id
-        if message.is_reply:
-            reply_to_id = message.reply_to_msg_id
-
+        reply_to_id = message.reply_to_msg_id if message.is_reply else message.id
         process = await aio.create_subprocess_shell(
             cmd, stdout=aio.subprocess.PIPE, stderr=aio.subprocess.PIPE
         )
@@ -632,11 +618,9 @@ async def set_password_zip(message):
         print(passdata[0])
         if str(message.sender_id) == passdata[0]:
             message.client.dl_passwords[int(data[1])][1] = data[2]
-            await message.reply(f"Password updated successfully.")
+            await message.reply("Password updated successfully.")
         else:
-            await message.reply(
-                f"Cannot update the password this is not your download."
-            )
+            await message.reply("Cannot update the password this is not your download.")
 
 
 async def start_handler(event):
@@ -649,8 +633,6 @@ def progress_bar(percentage):
     # percentage is on the scale of 0-1
     comp = get_val("COMPLETED_STR")
     ncomp = get_val("REMAINING_STR")
-    pr = ""
-
     if isinstance(percentage, str):
         return "NaN"
 
@@ -659,21 +641,12 @@ def progress_bar(percentage):
     except:
         percentage = 0
 
-    for i in range(1, 11):
-        if i <= int(percentage / 10):
-            pr += comp
-        else:
-            pr += ncomp
-    return pr
+    return "".join(comp if i <= percentage // 10 else ncomp for i in range(1, 11))
 
 
 async def handle_server_command(message):
     print(type(message))
-    if isinstance(message, events.CallbackQuery.Event):
-        callbk = True
-    else:
-        callbk = False
-
+    callbk = isinstance(message, events.CallbackQuery.Event)
     try:
         # Memory
         mem = psutil.virtual_memory()
@@ -788,22 +761,18 @@ async def about_me(message):
 
     val1 = get_val("RCLONE_ENABLED")
     if val1 is not None:
-        if val1:
-            rclone = "Rclone enabled by admin."
-        else:
-            rclone = "Rclone disabled by admin."
+        rclone = "Rclone enabled by admin." if val1 else "Rclone disabled by admin."
     else:
         rclone = "N/A"
 
     val1 = get_val("LEECH_ENABLED")
-    if val1 is not None:
-        if val1:
-            leen = "Leech command enabled by admin."
-        else:
-            leen = "Leech command disabled by admin."
-    else:
+    if val1 is None:
         leen = "N/A"
 
+    elif val1:
+        leen = "Leech command enabled by admin."
+    else:
+        leen = "Leech command disabled by admin."
     diff = time.time() - uptime
     diff = Human_Format.human_readable_timedelta(diff)
 
@@ -889,9 +858,12 @@ async def clear_thumb_cmd(e):
 
 
 async def handle_user_settings_(message):
-    if not message.sender_id in get_val("ALD_USR"):
-        if not get_val("USETTINGS_IN_PRIVATE") and message.is_private:
-            return
+    if (
+        message.sender_id not in get_val("ALD_USR")
+        and not get_val("USETTINGS_IN_PRIVATE")
+        and message.is_private
+    ):
+        return
 
     await handle_user_settings(message)
     await message.delete()

@@ -15,7 +15,7 @@ async def gen_ss(filepath, ts, opfilepath=None):
     # todo check the error pipe and do processing
     source = filepath
     destination = os.path.dirname(source)
-    ss_name = str(os.path.basename(source)) + "_" + str(round(time())) + ".jpg"
+    ss_name = f"{str(os.path.basename(source))}_{str(round(time()))}.jpg"
     ss_path = os.path.join(destination, ss_name)
 
     cmd = [
@@ -39,8 +39,8 @@ async def gen_ss(filepath, ts, opfilepath=None):
     spipe, epipe = await subpr.communicate()
     epipe = epipe.decode().strip()
     spipe = spipe.decode().strip()
-    torlog.info("Stdout Pipe :- {}".format(spipe))
-    torlog.info("Error Pipe :- {}".format(epipe))
+    torlog.info(f"Stdout Pipe :- {spipe}")
+    torlog.info(f"Error Pipe :- {epipe}")
 
     return ss_path
 
@@ -107,9 +107,8 @@ async def split_file(path, max_size, force_docs=False):
         while end_time <= total_duration:
 
             # file name generate
-            parted_file_name = "{}_PART_{}.{}".format(
-                str(base_name), str(i).zfill(5), str(input_extension)
-            )
+            parted_file_name = f"{str(base_name)}_PART_{str(i).zfill(5)}.{str(input_extension)}"
+
 
             output_file = os.path.join(split_dir, parted_file_name)
 
@@ -121,13 +120,10 @@ async def split_file(path, max_size, force_docs=False):
 
             # adding offset of 3 seconds to ensure smooth playback
             start_time = end_time - 3
-            end_time = end_time + minimum_duration
+            end_time += minimum_duration
             i = i + 1
 
-            if (end_time > total_duration) and not flag:
-                end_time = total_duration
-                flag = True
-            elif i + 1 == parts:
+            if end_time > total_duration and not flag or i + 1 == parts:
                 end_time = total_duration
                 flag = True
             elif flag:

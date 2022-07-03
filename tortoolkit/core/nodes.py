@@ -37,8 +37,7 @@ class TorNode(NodeMixin):
 
 def get_folders(path):
     path_seperator = "/"
-    folders = path.split(path_seperator)
-    return folders
+    return path.split(path_seperator)
 
 
 def make_tree(res):
@@ -52,10 +51,7 @@ def make_tree(res):
         TorNode: Parent node of the tree constructed and can be used further.
     """
     parent = TorNode("Torrent")
-    # nodes = dict()
-    l = 0
-
-    for i in res:
+    for l, i in enumerate(res):
         # Get the hierarchy of the folders by splitting based on '/'
         folders = get_folders(i.name)
         # Check if the file is alone for if its in folder
@@ -87,12 +83,12 @@ def make_tree(res):
 
                 # if the node is not found then create the folder node
                 # if the node is found then use it as base for the next
-                if current_node is None:
-                    previous_node = TorNode(
-                        folders[j], parent=previous_node, is_folder=True
-                    )
-                else:
-                    previous_node = current_node
+                previous_node = (
+                    TorNode(folders[j], parent=previous_node, is_folder=True)
+                    if current_node is None
+                    else current_node
+                )
+
             # at this point the previous_node will contain the deepest folder in it so add the file to it
             TorNode(
                 folders[-1],
@@ -103,7 +99,6 @@ def make_tree(res):
                 priority=i.priority,
                 file_id=l,
             )
-            l += 1
         else:
             # at the file to the parent if no folders are there
             TorNode(
@@ -115,8 +110,6 @@ def make_tree(res):
                 priority=i.priority,
                 file_id=l,
             )
-            l += 1
-
     return parent
 
     # Will be depricated after testing
@@ -139,7 +132,7 @@ def make_tree(res):
 
 def print_tree(parent):
     for pre, _, node in RenderTree(parent):
-        treestr = "%s%s" % (pre, node.name)
+        treestr = f"{pre}{node.name}"
         print(treestr.ljust(8), node.is_folder, node.is_file)
 
 
@@ -162,17 +155,13 @@ def create_list(par, msg):
                 msg[
                     0
                 ] += f'<input type="checkbox" name="filenode_{i.file_id}"> <label for="filenode_{i.file_id}">{i.name} - {human_readable_bytes(i.size)}</label>'
-                msg[
-                    0
-                ] += f'<input type="hidden" value="off" name="filenode_{i.file_id}">'
-
             else:
                 msg[
                     0
                 ] += f'<input type="checkbox" checked name="filenode_{i.file_id}"> <label for="filenode_{i.file_id}">{i.name} - {human_readable_bytes(i.size)}</label>'
-                msg[
-                    0
-                ] += f'<input type="hidden" value="off" name="filenode_{i.file_id}">'
+            msg[
+                0
+            ] += f'<input type="hidden" value="off" name="filenode_{i.file_id}">'
 
             msg[0] += "</li>"
 

@@ -44,11 +44,7 @@ async def handle_setting_callback(e):
         return
     if cmd[1] == "fdocs":
         await e.answer("")
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
-
+        val = cmd[2] == "true"
         db.set_variable("FORCE_DOCUMENTS", val)
         SessionVars.update_var("FORCE_DOCUMENTS", val)
         await handle_settings(
@@ -208,10 +204,7 @@ async def handle_setting_callback(e):
         await e.answer(
             "Note that this parameter will only work if rclone config is loaded."
         )
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
+        val = cmd[2] == "true"
         db.set_variable("RCLONE_ENABLED", val)
         SessionVars.update_var("RCLONE_ENABLED", val)
         mmes = await e.get_message()
@@ -225,11 +218,7 @@ async def handle_setting_callback(e):
 
     elif cmd[1] == "leechenable":
         await e.answer("")
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
-
+        val = cmd[2] == "true"
         db.set_variable("LEECH_ENABLED", val)
         SessionVars.update_var("LEECH_ENABLED", val)
         mmes = await e.get_message()
@@ -266,11 +255,7 @@ async def handle_setting_callback(e):
     elif cmd[1] == "fastupload":
         await e.answer("")
 
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
-
+        val = cmd[2] == "true"
         db.set_variable("FAST_UPLOAD", val)
         SessionVars.update_var("FAST_UPLOAD", val)
         mmes = await e.get_message()
@@ -284,11 +269,7 @@ async def handle_setting_callback(e):
     elif cmd[1] == "expressupload":
         await e.answer("")
 
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
-
+        val = cmd[2] == "true"
         db.set_variable("EXPRESS_UPLOAD", val)
         SessionVars.update_var("EXPRESS_UPLOAD", val)
         mmes = await e.get_message()
@@ -302,11 +283,7 @@ async def handle_setting_callback(e):
     elif cmd[1] == "allowuset":
         await e.answer("")
 
-        if cmd[2] == "true":
-            val = True
-        else:
-            val = False
-
+        val = cmd[2] == "true"
         db.set_variable("USETTINGS_IN_PRIVATE", val)
         SessionVars.update_var("USETTINGS_IN_PRIVATE", val)
         mmes = await e.get_message()
@@ -390,46 +367,44 @@ async def handle_settings(e, edit=False, msg="", submenu=None, session_id=None):
         rcval = await get_string_variable(
             "RCLONE_CONFIG", menu, "rcloneconfig", session_id
         )
-        if rcval != "None":
-            # create a all drives menu
-            if rcval == "Custom file is loaded.":
-                db = tordb
-                _, fdata = db.get_variable("RCLONE_CONFIG")
+        if rcval != "None" and rcval == "Custom file is loaded.":
+            db = tordb
+            _, fdata = db.get_variable("RCLONE_CONFIG")
 
-                path = os.path.join(os.getcwd(), "rclone.conf")
+            path = os.path.join(os.getcwd(), "rclone.conf")
 
-                # find alternative to this
-                with open(path, "wb") as fi:
-                    fi.write(fdata)
+            # find alternative to this
+            with open(path, "wb") as fi:
+                fi.write(fdata)
 
-                conf = configparser.ConfigParser()
-                conf.read(path)
-                # menu.append([KeyboardButton("Choose a default drive from below")])
-                def_drive = get_val("DEF_RCLONE_DRIVE")
+            conf = configparser.ConfigParser()
+            conf.read(path)
+            # menu.append([KeyboardButton("Choose a default drive from below")])
+            def_drive = get_val("DEF_RCLONE_DRIVE")
 
-                for j in conf.sections():
-                    prev = ""
-                    if j == def_drive:
-                        prev = yes
+            for j in conf.sections():
+                prev = ""
+                if j == def_drive:
+                    prev = yes
 
-                    if "team_drive" in list(conf[j]):
-                        menu.append(
-                            [
-                                KeyboardButtonCallback(
-                                    f"{prev}{j} - TD",
-                                    f"settings change_drive {j} {session_id}",
-                                )
-                            ]
-                        )
-                    else:
-                        menu.append(
-                            [
-                                KeyboardButtonCallback(
-                                    f"{prev}{j} - ND",
-                                    f"settings change_drive {j} {session_id}",
-                                )
-                            ]
-                        )
+                if "team_drive" in list(conf[j]):
+                    menu.append(
+                        [
+                            KeyboardButtonCallback(
+                                f"{prev}{j} - TD",
+                                f"settings change_drive {j} {session_id}",
+                            )
+                        ]
+                    )
+                else:
+                    menu.append(
+                        [
+                            KeyboardButtonCallback(
+                                f"{prev}{j} - ND",
+                                f"settings change_drive {j} {session_id}",
+                            )
+                        ]
+                    )
 
         await get_sub_menu("Go Back ⬅️", "mainmenu", session_id, menu)
         menu.append(
@@ -508,82 +483,84 @@ async def handle_settings(e, edit=False, msg="", submenu=None, session_id=None):
 
 # an attempt to manager all the input
 async def general_input_manager(e, mmes, var_name, datatype, value, db, sub_menu):
-    if value is not None and not "ignore" in value:
+    if value is not None and "ignore" not in value:
         await confirm_buttons(mmes, value)
         conf = await get_confirm(e)
-        if conf is not None:
-            if conf:
-                try:
-                    if datatype == "int":
-                        value = int(value)
-                    if datatype == "str":
-                        value = str(value)
-                    if datatype == "bool":
-                        if value.lower() == "true":
-                            value = True
-                        elif value.lower() == "false":
-                            value = False
-                        else:
-                            raise ValueError("Invalid value from bool")
-
-                    if var_name == "RCLONE_CONFIG":
-                        # adjust the special case
-                        try:
-                            conf = configparser.ConfigParser()
-                            conf.read(value)
-                            for i in conf.sections():
-                                db.set_variable("DEF_RCLONE_DRIVE", str(i))
-                                SessionVars.update_var("DEF_RCLONE_DRIVE", str(i))
-                                break
-
-                            with open(value, "rb") as fi:
-                                data = fi.read()
-                                db.set_variable("RCLONE_CONFIG", 0, True, data)
-                            os.remove(value)
-                            db.set_variable("LEECH_ENABLED", True)
-                            SessionVars.update_var("LEECH_ENABLED", True)
-                        except Exception:
-                            torlog.error(traceback.format_exc())
-                            await handle_settings(
-                                mmes,
-                                True,
-                                f"<b><u>The conf file is invalid check logs.</b></u>",
-                                sub_menu,
-                            )
-                            return
-                    else:
-                        db.set_variable(var_name, value)
-                        SessionVars.update_var(var_name, value)
-
-                    await handle_settings(
-                        mmes,
-                        True,
-                        f"<b><u>Received {var_name} value '{value}' with confirm.</b></u>",
-                        sub_menu,
-                    )
-                except ValueError:
-                    await handle_settings(
-                        mmes,
-                        True,
-                        f"<b><u>Value [{value}] not valid try again and enter {datatype}.</b></u>",
-                        sub_menu,
-                    )
-            else:
-                await handle_settings(
-                    mmes, True, f"<b><u>Confirm differed by user.</b></u>", sub_menu
-                )
-        else:
+        if conf is None:
             await handle_settings(
                 mmes,
                 True,
-                f"<b><u>Confirm timed out [waited 60s for input].</b></u>",
+                "<b><u>Confirm timed out [waited 60s for input].</b></u>",
                 sub_menu,
             )
+
+        elif conf:
+            try:
+                if datatype == "int":
+                    value = int(value)
+                if datatype == "str":
+                    value = str(value)
+                if datatype == "bool":
+                    if value.lower() == "true":
+                        value = True
+                    elif value.lower() == "false":
+                        value = False
+                    else:
+                        raise ValueError("Invalid value from bool")
+
+                if var_name == "RCLONE_CONFIG":
+                        # adjust the special case
+                    try:
+                        conf = configparser.ConfigParser()
+                        conf.read(value)
+                        for i in conf.sections():
+                            db.set_variable("DEF_RCLONE_DRIVE", str(i))
+                            SessionVars.update_var("DEF_RCLONE_DRIVE", str(i))
+                            break
+
+                        with open(value, "rb") as fi:
+                            data = fi.read()
+                            db.set_variable("RCLONE_CONFIG", 0, True, data)
+                        os.remove(value)
+                        db.set_variable("LEECH_ENABLED", True)
+                        SessionVars.update_var("LEECH_ENABLED", True)
+                    except Exception:
+                        torlog.error(traceback.format_exc())
+                        await handle_settings(
+                            mmes,
+                            True,
+                            "<b><u>The conf file is invalid check logs.</b></u>",
+                            sub_menu,
+                        )
+
+                        return
+                else:
+                    db.set_variable(var_name, value)
+                    SessionVars.update_var(var_name, value)
+
+                await handle_settings(
+                    mmes,
+                    True,
+                    f"<b><u>Received {var_name} value '{value}' with confirm.</b></u>",
+                    sub_menu,
+                )
+            except ValueError:
+                await handle_settings(
+                    mmes,
+                    True,
+                    f"<b><u>Value [{value}] not valid try again and enter {datatype}.</b></u>",
+                    sub_menu,
+                )
+        else:
+            await handle_settings(
+                mmes, True, "<b><u>Confirm differed by user.</b></u>", sub_menu
+            )
+
     else:
         await handle_settings(
             mmes,
             True,
-            f"<b><u>Entry Timed out [waited 60s for input]. OR else ignored.</b></u>",
+            "<b><u>Entry Timed out [waited 60s for input]. OR else ignored.</b></u>",
             sub_menu,
         )
 
@@ -604,10 +581,7 @@ async def get_value(e, file=False):
 
     start = time.time()
 
-    while not lis[0]:
-        if (time.time() - start) >= TIMEOUT_SEC:
-            break
-
+    while not lis[0] and not (time.time() - start) >= TIMEOUT_SEC:
         await aio.sleep(1)
 
     val = lis[1]
@@ -631,9 +605,7 @@ async def get_confirm(e):
 
     start = time.time()
 
-    while not lis[0]:
-        if (time.time() - start) >= TIMEOUT_SEC:
-            break
+    while not lis[0] and not (time.time() - start) >= TIMEOUT_SEC:
         await aio.sleep(1)
 
     val = lis[1]
@@ -650,21 +622,15 @@ async def val_input_callback(e, o_sender, lis, file):
     if not file:
         lis[0] = True
         lis[1] = e.text
-        await e.delete()
-    else:
-        if e.document is not None:
-            path = await e.download_media()
+    elif e.document is None:
+        if "ignore" in e.text:
             lis[0] = True
-            lis[1] = path
-            await e.delete()
-        else:
-            if "ignore" in e.text:
-                lis[0] = True
-                lis[1] = "ignore"
-                await e.delete()
-            else:
-                await e.delete()
-
+            lis[1] = "ignore"
+    else:
+        path = await e.download_media()
+        lis[0] = True
+        lis[1] = path
+    await e.delete()
     raise events.StopPropagation
 
 
@@ -676,10 +642,7 @@ async def get_confirm_callback(e, o_sender, lis):
     lis[0] = True
 
     data = e.data.decode().split(" ")
-    if data[1] == "true":
-        lis[1] = True
-    else:
-        lis[1] = False
+    lis[1] = data[1] == "true"
 
 
 async def confirm_buttons(e, val):
@@ -695,11 +658,7 @@ async def confirm_buttons(e, val):
 
 
 async def get_bool_variable(var_name, msg, menu, callback_name, session_id):
-    # handle the vars having bool values
-
-    val = get_val(var_name)
-
-    if val:
+    if val := get_val(var_name):
         # setting the value in callback so calls will be reduced ;)
         menu.append(
             [
@@ -743,7 +702,7 @@ async def get_string_variable(var_name, menu, callback_name, session_id):
         else:
             val = "Click here to load RCLONE config."
 
-    msg = var_name + " " + str(val)
+    msg = f"{var_name} {str(val)}"
     menu.append(
         [
             KeyboardButtonCallback(
@@ -760,7 +719,7 @@ async def get_int_variable(var_name, menu, callback_name, session_id):
     # handle the vars having string value
 
     val = get_val(var_name)
-    msg = var_name + " " + str(val)
+    msg = f"{var_name} {str(val)}"
     menu.append(
         [
             KeyboardButtonCallback(

@@ -36,9 +36,7 @@ def skipTorExp(func):
 async def cli_call(cmd: Union[str, List[str]]) -> Tuple[str, str]:
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    elif isinstance(cmd, (list, tuple)):
-        pass
-    else:
+    elif not isinstance(cmd, (list, tuple)):
         return None, None
 
     process = await asyncio.create_subprocess_exec(
@@ -69,7 +67,7 @@ async def get_yt_link_details(url: str) -> Union[Dict[str, str], None]:
         torlog.error(f"Error occured:- {error} for url {url}")
     # sanitize the json
     out = out.replace("\n", ",")
-    out = "[" + out + "]"
+    out = f"[{out}]"
     try:
         return json.loads(out)[0], None
     except:
@@ -115,64 +113,58 @@ async def create_quality_menu(
     else:
         data = jsons
 
-    # with open("test.txt","w") as f:
-    #    f.write(json.dumps(data))
-
     if data is None:
         return None, err
-    else:
-        unique_formats = dict()
-        for i in data.get("formats",[]):
-            c_format = i.get("format_note")
-            if c_format is None:
-                c_format = i.get("height")
-            if not c_format in unique_formats:
-                if i.get("filesize") is not None:
-                    unique_formats[c_format] = [i.get("filesize"), i.get("filesize")]
+    unique_formats = {}
+    for i in data.get("formats",[]):
+        c_format = i.get("format_note")
+        if c_format is None:
+            c_format = i.get("height")
+        if c_format in unique_formats:
+            if i.get("filesize") is not None:
+                if unique_formats[c_format][0] > i.get("filesize"):
+                    unique_formats[c_format][0] = i.get("filesize")
                 else:
-                    unique_formats[c_format] = [0, 0]
+                    unique_formats[c_format][1] = i.get("filesize")
 
-            else:
-                if i.get("filesize") is not None:
-                    if unique_formats[c_format][0] > i.get("filesize"):
-                        unique_formats[c_format][0] = i.get("filesize")
-                    else:
-                        unique_formats[c_format][1] = i.get("filesize")
+        else:
+            unique_formats[c_format] = (
+                [i.get("filesize"), i.get("filesize")]
+                if i.get("filesize") is not None
+                else [0, 0]
+            )
 
-        buttons = list()
-        for i in unique_formats.keys():
+    buttons = []
+    for i in unique_formats:
 
             # add human bytes here
-            if i == "tiny":
-                text = f"tiny [{human_readable_bytes(unique_formats[i][0])} - {human_readable_bytes(unique_formats[i][1])}] ➡️"
-                cdata = (
-                    f"ytdlsmenu|{i}|{message1.sender_id}|{suid}|{dest}"  # add user id
-                )
-            else:
-                text = f"{i} [{human_readable_bytes(unique_formats[i][0])} - {human_readable_bytes(unique_formats[i][1])}] ➡️"
-                cdata = (
-                    f"ytdlsmenu|{i}|{message1.sender_id}|{suid}|{dest}"  # add user id
-                )
-            buttons.append([KeyboardButtonCallback(text, cdata.encode("UTF-8"))])
-        buttons.append(
-            [
-                KeyboardButtonCallback(
-                    "Audios ➡️", f"ytdlsmenu|audios|{message1.sender_id}|{suid}|{dest}"
-                )
-            ]
+        if i == "tiny":
+            text = f"tiny [{human_readable_bytes(unique_formats[i][0])} - {human_readable_bytes(unique_formats[i][1])}] ➡️"
+        else:
+            text = f"{i} [{human_readable_bytes(unique_formats[i][0])} - {human_readable_bytes(unique_formats[i][1])}] ➡️"
+        cdata = (
+            f"ytdlsmenu|{i}|{message1.sender_id}|{suid}|{dest}"  # add user id
         )
-        await message.edit("Choose a quality/option available below.", buttons=buttons)
+        buttons.append([KeyboardButtonCallback(text, cdata.encode("UTF-8"))])
+    buttons.append(
+        [
+            KeyboardButtonCallback(
+                "Audios ➡️", f"ytdlsmenu|audios|{message1.sender_id}|{suid}|{dest}"
+            )
+        ]
+    )
+    await message.edit("Choose a quality/option available below.", buttons=buttons)
 
-        if jsons is None:
-            path = os.path.join(os.getcwd(), "userdata")
+    if jsons is None:
+        path = os.path.join(os.getcwd(), "userdata")
 
-            if not os.path.exists(path):
-                os.mkdir(path)
+        if not os.path.exists(path):
+            os.mkdir(path)
 
-            path = os.path.join(path, f"{suid}.json")
+        path = os.path.join(path, f"{suid}.json")
 
-            with open(path, "w", encoding="UTF-8") as file:
-                file.write(json.dumps(data))
+        with open(path, "w", encoding="UTF-8") as file:
+            file.write(json.dumps(data))
 
     return True, None
 
@@ -219,11 +211,11 @@ async def handle_ytdl_callbacks(e: MessageLike):
             await e.answer("Not valid user, Dont touch.")
             return
 
-        path = os.path.join(os.getcwd(), "userdata", data[3] + ".json")
+        path = os.path.join(os.getcwd(), "userdata", f"{data[3]}.json")
         if os.path.exists(path):
             with open(path) as file:
                 ytdata = json.loads(file.read())
-                buttons = list()
+                buttons = []
                 if data[1] == "audios":
                     for i in ["64K", "128K", "320K"]:
                         text = f"{i} [MP3]"
@@ -241,7 +233,7 @@ async def handle_ytdl_callbacks(e: MessageLike):
                             c_format = str(i.get("height"))
                             format_id = f"xxother{j}"
                             height = i.get("format")
-                        if not c_format == data[1]:
+                        if c_format != data[1]:
                             continue
 
                         if not height:
@@ -276,7 +268,7 @@ async def handle_ytdl_callbacks(e: MessageLike):
         if data[1] != str(e.sender_id):
             await e.answer("Not valid user, Dont touch.")
             return
-        path = os.path.join(os.getcwd(), "userdata", data[2] + ".json")
+        path = os.path.join(os.getcwd(), "userdata", f"{data[2]}.json")
         if os.path.exists(path):
             with open(path, encoding="UTF-8") as file:
                 ytdata = json.loads(file.read())
@@ -305,7 +297,7 @@ async def handle_ytdl_file_download(e: MessageLike):
 
     is_audio = False
 
-    path = os.path.join(os.getcwd(), "userdata", data[3] + ".json")
+    path = os.path.join(os.getcwd(), "userdata", f"{data[3]}.json")
     if os.path.exists(path):
         with open(path, encoding="UTF-8") as file:
             ytdata = json.loads(file.read())
@@ -318,27 +310,25 @@ async def handle_ytdl_file_download(e: MessageLike):
             if data[1].startswith("xxother"):
                 data[1] = data[1].replace("xxother", "")
                 data[1] = int(data[1])
-                j = 0
-                for i in ytdata.get("formats",[]):
+                for j, i in enumerate(ytdata.get("formats",[])):
                     if j == data[1]:
                         data[1] = i.get("format_id")
-                    j += 1
             else:
                 for i in ytdata.get("formats",[]):
                     if i.get("format_id") == data[1]:
                         print(i)
-                        if i.get("acodec") is not None:
-                            if "none" not in i.get("acodec"):
-                                is_audio = True
+                        if i.get("acodec") is not None and "none" not in i.get(
+                            "acodec"
+                        ):
+                            is_audio = True
 
             if data[1].endswith("K"):
                 cmd = f"yt-dlp -i --extract-audio --add-metadata --audio-format mp3 --audio-quality {data[1]} -o '{op_dir}/%(title)s.%(ext)s' {yt_url}"
 
+            elif is_audio:
+                cmd = f"yt-dlp --continue --embed-subs --no-warnings --hls-prefer-ffmpeg --prefer-ffmpeg -f {data[1]} -o {op_dir}/%(title)s.%(ext)s {yt_url}"
             else:
-                if is_audio:
-                    cmd = f"yt-dlp --continue --embed-subs --no-warnings --hls-prefer-ffmpeg --prefer-ffmpeg -f {data[1]} -o {op_dir}/%(title)s.%(ext)s {yt_url}"
-                else:
-                    cmd = f"yt-dlp --continue --embed-subs --no-warnings --hls-prefer-ffmpeg --prefer-ffmpeg -f {data[1]}+bestaudio[ext=m4a]/best -o {op_dir}/%(title)s.%(ext)s {yt_url}"
+                cmd = f"yt-dlp --continue --embed-subs --no-warnings --hls-prefer-ffmpeg --prefer-ffmpeg -f {data[1]}+bestaudio[ext=m4a]/best -o {op_dir}/%(title)s.%(ext)s {yt_url}"
 
             out, err = await cli_call(cmd)
 
@@ -449,8 +439,6 @@ async def handle_ytdl_playlist(e: MessageLike) -> None:
             return
 
         entlen = len(entities)
-        keybr = list()
-
         # limit the max vids
         if entlen > get_val("MAX_YTPLAYLIST_SIZE"):
 
@@ -462,48 +450,52 @@ async def handle_ytdl_playlist(e: MessageLike) -> None:
         # format> ytdlplaylist | quality | suid | sender_id
         suid = str(time.time()).replace(".", "")
 
-        for i in ["144", "240", "360", "480", "720", "1080", "1440", "2160"]:
-            keybr.append(
+        keybr = [
+            [
+                KeyboardButtonCallback(
+                    text=f"{i}p All videos",
+                    data=f"ytdlplaylist|{i}|{suid}|{e.sender_id}|{choice}",
+                )
+            ]
+            for i in [
+                "144",
+                "240",
+                "360",
+                "480",
+                "720",
+                "1080",
+                "1440",
+                "2160",
+            ]
+        ]
+
+        keybr.extend(
+            (
                 [
                     KeyboardButtonCallback(
-                        text=f"{i}p All videos",
-                        data=f"ytdlplaylist|{i}|{suid}|{e.sender_id}|{choice}",
+                        text="Best All videos",
+                        data=f"ytdlplaylist|best|{suid}|{e.sender_id}|{choice}",
                     )
-                ]
+                ],
+                [
+                    KeyboardButtonCallback(
+                        text="Best all audio only. [340k]",
+                        data=f"ytdlplaylist|320k|{suid}|{e.sender_id}|{choice}",
+                    )
+                ],
+                [
+                    KeyboardButtonCallback(
+                        text="Medium all audio only. [128k]",
+                        data=f"ytdlplaylist|128k|{suid}|{e.sender_id}|{choice}",
+                    )
+                ],
+                [
+                    KeyboardButtonCallback(
+                        text="Worst all audio only. [64k]",
+                        data=f"ytdlplaylist|64k|{suid}|{e.sender_id}|{choice}",
+                    )
+                ],
             )
-
-        keybr.append(
-            [
-                KeyboardButtonCallback(
-                    text=f"Best All videos",
-                    data=f"ytdlplaylist|best|{suid}|{e.sender_id}|{choice}",
-                )
-            ]
-        )
-
-        keybr.append(
-            [
-                KeyboardButtonCallback(
-                    text="Best all audio only. [340k]",
-                    data=f"ytdlplaylist|320k|{suid}|{e.sender_id}|{choice}",
-                )
-            ]
-        )
-        keybr.append(
-            [
-                KeyboardButtonCallback(
-                    text="Medium all audio only. [128k]",
-                    data=f"ytdlplaylist|128k|{suid}|{e.sender_id}|{choice}",
-                )
-            ]
-        )
-        keybr.append(
-            [
-                KeyboardButtonCallback(
-                    text="Worst all audio only. [64k]",
-                    data=f"ytdlplaylist|64k|{suid}|{e.sender_id}|{choice}",
-                )
-            ]
         )
 
         await msg.edit(f"Found {entlen} videos in the playlist.", buttons=keybr)
@@ -537,7 +529,7 @@ async def handle_ytdl_playlist_down(e: MessageLike) -> None:
         await e.answer("Crunching Data.....")
 
     await e.edit(buttons=None)
-    path = os.path.join(os.getcwd(), "userdata", data[2] + ".json")
+    path = os.path.join(os.getcwd(), "userdata", f"{data[2]}.json")
     if os.path.exists(path):
         await e.answer("Processing Please wait")
         opdir = os.path.join(os.getcwd(), "userdata", data[2])
@@ -628,25 +620,22 @@ async def print_files(e, files):
     rmsg = await rmsg.get_reply_message()
     if rmsg is None:
         # msg += "\n<a href='tg://user?id={}'>Done<a>".format(rmsg.sender_id)
-        msg += "\n<a href='tg://user?id={}'>Done</a>".format(e.sender_id)
+        msg += f"\n<a href='tg://user?id={e.sender_id}'>Done</a>"
         await e.reply(msg, parse_mode="html")
     else:
-        msg += "\n<a href='tg://user?id={}'>Done</a>".format(rmsg.sender_id)
+        msg += f"\n<a href='tg://user?id={rmsg.sender_id}'>Done</a>"
         await rmsg.reply(msg, parse_mode="html")
 
     if len(files) < 2:
         return
 
-    ids = list()
-    for i in files.keys():
-        ids.append(files[i])
-
+    ids = [files[i] for i in files.keys()]
     msgs = await e.client.get_messages(e.chat_id, ids=ids)
     for i in msgs:
         index = None
-        for j in range(0, len(msgs)):
+        for j in range(len(msgs)):
             index = j
-            if ids[j] == i.id:
+            if ids[index] == i.id:
                 break
         nextt, prev = "", ""
         chat_id = str(e.chat_id)[4:]
@@ -698,14 +687,7 @@ async def get_ytdl_choice(e, timestamp):
     while not lis[0]:
         if (time.time() - start) >= 60:  # TIMEOUT_SEC:
 
-            if defleech == "leech":
-                return "tg"
-            elif defleech == "rclone":
-                return "drive"
-            else:
-                # just in case something goes wrong
-                return "tg"
-            break
+            return "drive" if defleech == "rclone" else "tg"
         await asyncio.sleep(1)
 
     val = lis[1]

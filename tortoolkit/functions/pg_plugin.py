@@ -13,11 +13,7 @@ class DataBaseHandle:
     def __init__(self, dburl=None):
         """Load the DB URL if available"""
         self._dburl = dburl
-        if isinstance(self._dburl, bool):
-            self._block = True
-        else:
-            self._block = False
-
+        self._block = isinstance(self._dburl, bool)
         if self._block:
             return
 
@@ -33,7 +29,7 @@ class DataBaseHandle:
     def scur(self, dictcur=False):
         # start cursor
         cur = None
-        for i in range(0, 5):
+        for i in range(5):
             try:
                 if dictcur:
                     cur = self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
